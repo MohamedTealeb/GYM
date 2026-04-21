@@ -4,32 +4,40 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UserRepository } from '../../common/database/repository/user.repository';
-import { GenerateOtp } from '../../common/utils/generate_otp';
-import { MailService } from '../../common/mail/mail.service';
-import { CreateAuthDto, ForgotPasswordDto, LoginAuthDto } from './dto/create-auth.dto';
-
-export interface JwtPayload {
-  sub: number;
-  email?: string;
-  role?: string;
-}
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { AuthOtpService } from './services/auth-otp.service';
+import { AuthTokenService } from './services/auth-token.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly users: UserRepository,
-    private readonly jwtService: JwtService,
-    private readonly mailService: MailService,
+    private readonly authOtpService: AuthOtpService,
+    private readonly authTokenService: AuthTokenService,
   ) {}
 
   async validateUserById(id: number) {
-    return id ? { id } : null;
+    if (!id) {
+      return null;
+    }
+
+    const user = await this.users.findById(id);
+    if (!user) {
+      return null;
+    }
+
+    return {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
   }
 
-  async register(dto: CreateAuthDto) {
+  async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase();
     const existing = await this.users.findByEmail(email);
 
@@ -38,9 +46,8 @@ export class AuthService {
     }
 
     const hashedPassword = await bcrypt.hash(dto.password, 10);
-    const otp = GenerateOtp.generate();
-    const otpHash = await bcrypt.hash(otp, 10);
-    const otpExpires = GenerateOtp.getExpiryDate();
+    const { otp, otpHash, otpExpires } =
+      await this.authOtpService.generateOtpPayload();
 
     const createdUser = await this.users.create({
       email,
@@ -53,7 +60,7 @@ export class AuthService {
       otpExpires,
     });
 
-    await this.mailService.sendOtpEmail({ to: createdUser.email, otp });
+    await this.authOtpService.sendOtpEmail(createdUser.email, otp);
 
     return {
       user: {
@@ -67,9 +74,9 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginAuthDto) {
+  async login(dto: LoginDto) {
     const user = await this.users.findByEmail(dto.email.toLowerCase());
-  
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -81,7 +88,11 @@ export class AuthService {
       throw new UnauthorizedException('User is not active');
     }
     return {
-      accessToken: await this.signToken(user.id, user.email, user.role),
+      accessToken: await this.authTokenService.signAccessToken(
+        user.id,
+        user.email,
+        user.role,
+      ),
     };
   }
 
@@ -92,60 +103,57 @@ export class AuthService {
     if (!user) throw new NotFoundException('User not found');
     if (user.isActive) return { verified: true };
 
-    if (!user.otp || !user.otpExpires) {
-      throw new UnauthorizedException('OTP is not requested');
-    }
-
-    if (new Date(user.otpExpires).getTime() < Date.now()) {
-      throw new UnauthorizedException('OTP expired');
-    }
-
-    const ok = await bcrypt.compare(params.otp, user.otp);
-    if (!ok) throw new UnauthorizedException('Invalid OTP');
+    await this.authOtpService.assertOtpIsValid({
+      providedOtp: params.otp,
+      storedOtp: user.otp,
+      otpExpires: user.otpExpires,
+    });
 
     await this.users.activateByEmail(email);
     return { verified: true };
   }
+
   async resendOtp(email: string) {
     const user = await this.users.findByEmail(email.toLowerCase());
     if (!user) throw new NotFoundException('User not found');
     if (user.isActive) return { verified: true };
-    const otp = GenerateOtp.generate();
-    const otpHash = await bcrypt.hash(otp, 10);
-    const otpExpires = GenerateOtp.getExpiryDate();
+
+    const { otp, otpHash, otpExpires } =
+      await this.authOtpService.generateOtpPayload();
+
     await this.users.setOtpByEmail({ email, otp: otpHash, otpExpires });
-    await this.mailService.sendOtpEmail({ to: email, otp });
-    return { otpResent: true, message: 'OTP resent successfully' }; 
+    await this.authOtpService.sendOtpEmail(email, otp);
+
+    return { otpResent: true, message: 'OTP resent successfully' };
   }
 
   async forgotPassword(dto: ForgotPasswordDto) {
     const email = dto.email.toLowerCase();
     const user = await this.users.findByEmail(email.toLowerCase());
     if (!user) throw new NotFoundException('User not found');
-    const otp = GenerateOtp.generate();
-    const otpHash = await bcrypt.hash(otp, 10);
-    const otpExpires = GenerateOtp.getExpiryDate();
+
+    const { otp, otpHash, otpExpires } =
+      await this.authOtpService.generateOtpPayload();
+
     await this.users.setOtpByEmail({ email, otp: otpHash, otpExpires });
-    await this.mailService.sendOtpEmail({ to: email, otp });
+    await this.authOtpService.sendOtpEmail(email, otp);
+
     return { otpSent: true, message: 'OTP sent successfully' };
   }
+
   async resetPassword(email: string, otp: string, password: string) {
     const user = await this.users.findByEmail(email.toLowerCase());
     if (!user) throw new NotFoundException('User not found');
-    if (!user.otp) throw new UnauthorizedException('OTP is not requested');
-    if (user.otpExpires && new Date(user.otpExpires).getTime() < Date.now()) {
-      throw new UnauthorizedException('OTP expired');
-    }
-    const isOtpValid = await bcrypt.compare(otp, user.otp);
-    if (!isOtpValid) throw new UnauthorizedException('Invalid OTP');
+
+    await this.authOtpService.assertOtpIsValid({
+      providedOtp: otp,
+      storedOtp: user.otp,
+      otpExpires: user.otpExpires,
+    });
+
     const hashedPassword = await bcrypt.hash(password, 10);
     await this.users.updatePasswordById({ id: user.id, password: hashedPassword });
     await this.users.setOtpByEmail({ email, otp: null, otpExpires: null });
     return { passwordReset: true, message: 'Password reset successfully' };
-  }
- 
-  private async signToken(userId: number, email: string, role: string) {
-    const payload: JwtPayload = { sub: userId, email, role };
-    return this.jwtService.signAsync(payload);
   }
 }

@@ -7,6 +7,7 @@ import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
+import { UsersModule } from './modules/users/users.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -14,7 +15,7 @@ import { AuthModule } from './modules/auth/auth.module';
   }),CacheModule.register({
     isGlobal:true,
     ttl:60,
-  }), AuthModule],
+  }), AuthModule, UsersModule],
   controllers: [AppController],
   providers: [
     AppService,

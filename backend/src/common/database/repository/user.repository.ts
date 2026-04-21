@@ -27,6 +27,12 @@ export class UserRepository extends DatabaseRepository<UserModel> {
     return this.findOneBy('email', email.toLowerCase());
   }
 
+  async findById(id: number): Promise<UserModel | null> {
+    return this.prisma.user.findUnique({
+      where: { id },
+    }) as unknown as UserModel | null;
+  }
+
   async create(data: {
     email: string;
     password: string;

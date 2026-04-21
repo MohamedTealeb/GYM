@@ -1,7 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService } from '@nestjs/jwt';
 import { UserRepository } from '../../common/database/repository/user.repository';
 import { AuthService } from './auth.service';
+import { AuthOtpService } from './services/auth-otp.service';
+import { AuthTokenService } from './services/auth-token.service';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -17,9 +18,17 @@ describe('AuthService', () => {
           },
         },
         {
-          provide: JwtService,
+          provide: AuthOtpService,
           useValue: {
-            signAsync: jest.fn(),
+            generateOtpPayload: jest.fn(),
+            sendOtpEmail: jest.fn(),
+            assertOtpIsValid: jest.fn(),
+          },
+        },
+        {
+          provide: AuthTokenService,
+          useValue: {
+            signAccessToken: jest.fn(),
           },
         },
       ],
