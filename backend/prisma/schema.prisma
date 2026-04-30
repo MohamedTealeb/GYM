@@ -28,9 +28,12 @@ model User{
   isActive Boolean  @default(false)
   otp         String?
   otpExpires  DateTime?
+  profileImage String?
   trainerProfile TrainerProfile?
   workouts       Workout[]
   progressLogs   Progress[]
+   bodyPhotos      BodyPhoto[]  
+  
 }
  model TrainerProfile {
   id          Int     @id @default(autoincrement())
@@ -63,7 +66,7 @@ model Exercise {
   reps      Int
   workoutId Int
 
-  workout   Workout @relation(fields: [workoutId], references: [id])
+  workout   Workout @relation(fields: [workoutId], references: [id],onDelete: Cascade)
 }
 
 model Progress {
@@ -73,5 +76,14 @@ model Progress {
   notes     String?
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation(fields: [userId], references: [id] ,onDelete: Cascade)
+}
+model BodyPhoto {
+  id         Int      @id @default(autoincrement())
+  imageUrl   String
+  note       String?
+  createdAt  DateTime @default(now())
+
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

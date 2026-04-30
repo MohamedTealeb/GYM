@@ -13,6 +13,7 @@ export interface UserModel {
   isActive?: boolean;
   otp?: string | null;
   otpExpires?: Date | null;
+  profileImage?: string | null;
 }
 
 @Injectable()
@@ -42,6 +43,7 @@ export class UserRepository extends DatabaseRepository<UserModel> {
     isActive?: boolean;
     otp?: string | null;
     otpExpires?: Date | null;
+    profileImage?: string | null;
   }): Promise<UserModel> {
     return this.prisma.user.create({
       data: {
@@ -53,6 +55,7 @@ export class UserRepository extends DatabaseRepository<UserModel> {
         isActive: data.isActive ?? false,
         otp: data.otp ?? null,
         otpExpires: data.otpExpires ?? null,
+        profileImage: data.profileImage ?? null,
       },
     }) as unknown as UserModel;
   }

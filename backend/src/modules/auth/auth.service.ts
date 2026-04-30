@@ -37,7 +37,7 @@ export class AuthService {
     };
   }
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, profileImage?: string | null) {
     const email = dto.email.toLowerCase();
     const existing = await this.users.findByEmail(email);
 
@@ -58,6 +58,7 @@ export class AuthService {
       isActive: false,
       otp: otpHash,
       otpExpires,
+      profileImage: profileImage ?? null,
     });
 
     await this.authOtpService.sendOtpEmail(createdUser.email, otp);
@@ -70,6 +71,7 @@ export class AuthService {
         fullName: createdUser.fullName,
         phone: createdUser.phone,
         isActive: createdUser.isActive ?? false,
+        profileImage: createdUser.profileImage ?? null,
       },
     };
   }

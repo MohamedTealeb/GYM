@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEmail, IsPhoneNumber, IsString, MinLength } from 'class-validator';
 
 export class RegisterDto {
@@ -20,4 +20,7 @@ export class RegisterDto {
   @IsString()
   @IsPhoneNumber(undefined, { message: 'Invalid phone number' })
   phone!: string;
+
+  @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  profileImage?: unknown;
 }

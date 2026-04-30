@@ -1,5 +1,6 @@
-import { Body, Controller, Post } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -8,6 +9,8 @@ import { ResendOtpDto } from './dto/resend-otp.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { successResponse } from '../../common/utils/response';
+import { localFileUpload } from '../../common/utils/multer/local.multer';
+import { FileValidation } from '../../common/utils/multer/validation.multer';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -15,11 +18,27 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @ApiOperation({ summary: 'Register a new user' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor(
+      'profileImage',
+      localFileUpload({
+        folder: 'profileImage',
+        validation: FileValidation.image,
+      }),
+    ),
+  )
   @ApiBody({ type: RegisterDto })
   @ApiResponse({ status: 201, description: 'User registered successfully' })
   @Post('register')
-  async register(@Body() dto: RegisterDto) {
-    return successResponse(await this.auth.register(dto), 'User registered successfully');
+  async register(
+    @Body() dto: RegisterDto,
+    @UploadedFile() profileImage?: Express.Multer.File & { finalPath?: string },
+  ) {
+    return successResponse(
+      await this.auth.register(dto, profileImage?.finalPath ?? null),
+      'User registered successfully',
+    );
   }
 
   @ApiOperation({ summary: 'Login a user' })
