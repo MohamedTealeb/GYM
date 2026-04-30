@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsPhoneNumber, IsString, MinLength } from 'class-validator';
+import {
+  Allow,
+  IsEmail,
+  IsOptional,
+  IsPhoneNumber,
+  IsString,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -22,5 +29,7 @@ export class RegisterDto {
   phone!: string;
 
   @ApiPropertyOptional({ type: 'string', format: 'binary' })
+  @IsOptional()
+  @Allow()
   profileImage?: unknown;
 }

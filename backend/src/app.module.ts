@@ -8,6 +8,10 @@ import { ConfigModule } from '@nestjs/config';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { PlansModule } from './modules/plans/plans.module';
+import { ProgressModule } from './modules/progress/progress.module';
+import { BodyPhotosModule } from './modules/body-photos/body-photos.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -15,7 +19,14 @@ import { UsersModule } from './modules/users/users.module';
   }),CacheModule.register({
     isGlobal:true,
     ttl:60,
-  }), AuthModule, UsersModule],
+  }),
+    AuthModule,
+    UsersModule,
+    SubscriptionsModule,
+    PlansModule,
+    ProgressModule,
+    BodyPhotosModule,
+  ],
   controllers: [AppController],
   providers: [
     AppService,

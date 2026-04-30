@@ -1,6 +1,7 @@
 import { Body, Controller, Post, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBody, ApiConsumes, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { unlink } from 'node:fs/promises';
 import { AuthService } from './auth.service';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -35,10 +36,17 @@ export class AuthController {
     @Body() dto: RegisterDto,
     @UploadedFile() profileImage?: Express.Multer.File & { finalPath?: string },
   ) {
-    return successResponse(
-      await this.auth.register(dto, profileImage?.finalPath ?? null),
-      'User registered successfully',
-    );
+    try {
+      return successResponse(
+        await this.auth.register(dto, profileImage?.finalPath ?? null),
+        'User registered successfully',
+      );
+    } catch (error) {
+      if (profileImage?.path) {
+        await unlink(profileImage.path).catch(() => undefined);
+      }
+      throw error;
+    }
   }
 
   @ApiOperation({ summary: 'Login a user' })

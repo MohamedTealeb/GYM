@@ -17,6 +17,36 @@ enum Role{
   TRAINER
 }
 
+enum PlanTier {
+  PLUS
+  PRO
+  PREMIUM
+}
+
+enum PlanDuration {
+  MONTH_1
+  MONTH_3
+  YEAR_1
+}
+
+enum FollowUpCadence {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  EXPIRED
+  CANCELED
+}
+
+enum MonthlyPlanStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
 model User{
    id        Int      @id @default(autoincrement())
   email     String   @unique
@@ -33,7 +63,124 @@ model User{
   workouts       Workout[]
   progressLogs   Progress[]
    bodyPhotos      BodyPhoto[]  
+  subscriptions UserSubscription[]
+  monthlyPlansAsClient MonthlyPlan[] @relation("MonthlyPlanClient")
+  monthlyPlansAsTrainer MonthlyPlan[] @relation("MonthlyPlanTrainer")
+  monthlyPlanEdits MonthlyPlanEdit[]
   
+}
+
+model SubscriptionPlan {
+  id              Int            @id @default(autoincrement())
+  tier            PlanTier
+  duration        PlanDuration
+  price           Float
+  isEnabled       Boolean        @default(true)
+  salePrice       Float?
+  saleStartsAt    DateTime?
+  saleEndsAt      DateTime?
+  followUpCadence FollowUpCadence
+  maxPlanEditsPerMonth Int?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  userSubscriptions UserSubscription[]
+
+  @@unique([tier, duration])
+}
+
+model UserSubscription {
+  id        Int               @id @default(autoincrement())
+  userId    Int
+  planId    Int
+  status    SubscriptionStatus @default(ACTIVE)
+  startsAt  DateTime          @default(now())
+  endsAt    DateTime
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  @@index([userId])
+  @@index([planId])
+}
+
+model MonthlyPlan {
+  id        Int              @id @default(autoincrement())
+  clientId  Int
+  trainerId Int
+  monthStart DateTime
+  status    MonthlyPlanStatus @default(DRAFT)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  client  User @relation("MonthlyPlanClient", fields: [clientId], references: [id], onDelete: Cascade)
+  trainer User @relation("MonthlyPlanTrainer", fields: [trainerId], references: [id], onDelete: Cascade)
+
+  diet    DietPlan?
+  workouts PlanWorkout[]
+  edits   MonthlyPlanEdit[]
+  progressLogs Progress[]
+  bodyPhotos BodyPhoto[]
+
+  @@unique([clientId, monthStart])
+  @@index([trainerId])
+}
+
+model MonthlyPlanEdit {
+  id          Int      @id @default(autoincrement())
+  monthlyPlanId Int
+  trainerId   Int
+  createdAt   DateTime @default(now())
+
+  monthlyPlan MonthlyPlan @relation(fields: [monthlyPlanId], references: [id], onDelete: Cascade)
+  trainer     User @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([monthlyPlanId])
+  @@index([trainerId])
+  @@index([createdAt])
+}
+
+model DietPlan {
+  id           Int       @id @default(autoincrement())
+  monthlyPlanId Int      @unique
+  targetCalories Int?
+  proteinGrams  Int?
+  carbsGrams    Int?
+  fatGrams      Int?
+  notes         String?
+
+  monthlyPlan MonthlyPlan @relation(fields: [monthlyPlanId], references: [id], onDelete: Cascade)
+}
+
+model PlanWorkout {
+  id            Int       @id @default(autoincrement())
+  monthlyPlanId Int
+  title         String
+  description   String?
+  dayOfWeek     Int?      // 0..6 (optional)
+  workoutDate   DateTime? // optional exact date
+  createdAt     DateTime  @default(now())
+
+  monthlyPlan MonthlyPlan @relation(fields: [monthlyPlanId], references: [id], onDelete: Cascade)
+  exercises  PlanExercise[]
+
+  @@index([monthlyPlanId])
+}
+
+model PlanExercise {
+  id           Int    @id @default(autoincrement())
+  planWorkoutId Int
+  name         String
+  sets         Int
+  reps         Int
+  restSeconds  Int?
+  notes        String?
+
+  workout PlanWorkout @relation(fields: [planWorkoutId], references: [id], onDelete: Cascade)
+
+  @@index([planWorkoutId])
 }
  model TrainerProfile {
   id          Int     @id @default(autoincrement())
@@ -72,11 +219,15 @@ model Exercise {
 model Progress {
   id        Int      @id @default(autoincrement())
   userId    Int
+  monthlyPlanId Int?
   weight    Float?
   notes     String?
   createdAt DateTime @default(now())
 
   user      User     @relation(fields: [userId], references: [id] ,onDelete: Cascade)
+  monthlyPlan MonthlyPlan? @relation(fields: [monthlyPlanId], references: [id], onDelete: SetNull)
+
+  @@index([monthlyPlanId])
 }
 model BodyPhoto {
   id         Int      @id @default(autoincrement())
@@ -85,5 +236,9 @@ model BodyPhoto {
   createdAt  DateTime @default(now())
 
   userId     Int
+  monthlyPlanId Int?
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monthlyPlan MonthlyPlan? @relation(fields: [monthlyPlanId], references: [id], onDelete: SetNull)
+
+  @@index([monthlyPlanId])
 }
